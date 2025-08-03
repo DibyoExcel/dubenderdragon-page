@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Audio Vizualizer</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: black;
+      overflow: auto;
+      font-family: sans-serif;
+      color: white;
+      text-align: center;
+    }
+    .center {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+    }
+    canvas {
+      display: block;
+      border: 5px solid #ffffff;
+      border-radius: 10px;
+      width: 75%;
+      margin: auto;
+      background-image: url(https://wallpapercave.com/wp/wp8368519.jpg);
+      background-size: cover;
+      background-position: center;
+    }
+    #controls {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    #stopBtn { background-color: #ff0000; }   /* Red */
+    #resumeBtn { background-color: #00ff00; }  /* Green */
+    #pauseBtn { background-color: #00ffff; }    /* Blue */
+    #audioFile { background-color: #ff00ff; }    /* magenta */
+
+  </style>
+</head>
+<body>
+    <p>Pick a song</p>
+    <input type="file" id="audioFile" accept="audio/*" />
+    <div id="controls">
+      <button id="pauseBtn">Pause</button>
+      <button id="resumeBtn">Resume</button>
+      <button id="stopBtn">Stop</button>
+    </div>
+  <div class="center">
+  </div>
+  <canvas id="circleVisualizer"></canvas>
+
+  <script>
+    const fileInput = document.getElementById("audioFile");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const resumeBtn = document.getElementById("resumeBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const canvas = document.getElementById("circleVisualizer");
+    const ctx = canvas.getContext("2d");
+
+    const logoImg = new Image();
+    logoImg.src = "logo.png";
+
+    canvas.width = 1280;
+    canvas.height = 720;
+
+
+    let audio, audioCtx, analyser, dataArray, bufferLength, animationId;
+
+    fileInput.onchange = function () {
+      const file = this.files[0];
+      if (file) {
+        if (audio) {
+          audio.pause();
+          audio = null;
+        }
+
+        audio = new Audio(URL.createObjectURL(file));
+        audio.crossOrigin = "anonymous";
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        const source = audioCtx.createMediaElementSource(audio);
+
+        source.connect(analyser);
+        analyser.connect(audioCtx.destination);
+
+        analyser.fftSize = 128;
+        bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+
+        audio.play();
+        audioCtx.resume().then(() => draw());
+      }
+    };
+
+    pauseBtn.onclick = () => {
+      if (audio && !audio.paused) {
+        audio.pause();
+        cancelAnimationFrame(animationId);
+      }
+    };
+
+    resumeBtn.onclick = () => {
+      if (audio && audio.paused) {
+        audio.play();
+        audioCtx.resume().then(() => draw());
+      }
+    };
+
+    stopBtn.onclick = () => {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        cancelAnimationFrame(animationId);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
+    function draw() {
+      animationId = requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(dataArray);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const average = Math.min(150, dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length);
+      const time = Date.now() * 0.005;
+      const rnadomShake = (average >= 50 ? (((Math.random() * 2)-1) * average)*0.1 * Math.sin(time * 2) : 0);
+      const rnadomShake2 = (average >= 50 ? (((Math.random() * 2)-1) * average)*0.1 * Math.cos(time * 2) : 0);
+      const centerX = (canvas.width / 2)+rnadomShake;
+      const centerY = (canvas.height / 2)+rnadomShake2;
+      const scale = 1 + average / 100;
+      const radius = 80 * scale;
+
+      for (let i = 0; i <= bufferLength; i++) {
+        const angle = (((i / (bufferLength-1))/2) - 0.25) * Math.PI * 2;
+        const barHeight = dataArray[i] * 0.75 + 1;
+        const x = centerX + Math.cos(angle) * radius;
+        const y = centerY + Math.sin(angle) * radius;
+        const xEnd = centerX + Math.cos(angle) * (radius + barHeight);
+        const yEnd = centerY + Math.sin(angle) * (radius + barHeight);
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(xEnd, yEnd);
+        ctx.strokeStyle = `hsl(${(i * 6)+(time*10)}, 100%, 50%)`;
+        ctx.lineWidth = 10;
+        ctx.stroke();
+        //2
+        const x2 = centerX - Math.cos(angle) * radius;
+        const y2 = centerY + Math.sin(angle) * radius;
+        const xEnd2 = centerX - Math.cos(angle) * (radius + barHeight);
+        const yEnd2 = centerY + Math.sin(angle) * (radius + barHeight);
+
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(xEnd2, yEnd2);
+        ctx.strokeStyle = `hsl(${(i * 6)+(time*10)}, 100%, 50%)`;
+        ctx.lineWidth = 10;
+        ctx.stroke();
+      }
+      const logoSize = 160 * scale;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, logoSize / 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(
+        logoImg,
+        centerX - logoSize / 2,
+        centerY - logoSize / 2,
+        logoSize,
+        logoSize
+      );
+      ctx.restore();
+    }
+  </script>
+</body>
+</html>
