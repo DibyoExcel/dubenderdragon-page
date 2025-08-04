@@ -10,9 +10,9 @@ model-viewer{
     background-color: #202020;
     border: 5px solid #fff;
     border-radius: 10px;
-    height: 200px;
-    min-width: 200px;
-    max-width: 200px;
+    height: 300px;
+    min-width: 300px;
+    max-width: 300px;
     font-family: "Mojangles";
     text-align: center;
     font-size: medium;
